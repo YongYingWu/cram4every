@@ -41,6 +41,33 @@
   .mode-tab{padding:8px 22px;border-radius:9px;font-size:14px;font-weight:600;color:#5a6376;cursor:pointer;transition:.15s;border:none;background:none;font-family:inherit}
   .mode-tab.active{background:#fff;color:var(--brand);box-shadow:0 1px 4px rgba(20,30,60,.12)}
 
+  /* ===== import modal ===== */
+  .import-btn{margin-bottom:16px}
+  .import-field{margin-bottom:14px}
+  .import-field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#3a4152}
+  .import-field input{width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;
+                     font-size:14px;font-family:inherit;outline:none;transition:.15s}
+  .import-field input:focus{border-color:var(--brand)}
+  .import-log{background:#1e2430;color:#a8e6a3;border-radius:10px;padding:12px 14px;font-size:12.5px;
+              font-family:ui-monospace,Consolas,monospace;max-height:220px;overflow:auto;white-space:pre-wrap;
+              display:none;margin-bottom:14px;line-height:1.6}
+  .import-log.show{display:block}
+  .import-log .err{color:#ff9a9a}
+  .modal.wide{max-width:680px;text-align:left}
+  .modal.wide .modal-title{font-size:17px;font-weight:800;margin-bottom:16px;text-align:center}
+  .json-box{margin-top:14px}
+  .json-box-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .json-box-head b{font-size:13.5px}
+  .json-box-head .hint{font-size:12px;color:var(--muted);flex:1}
+  .copy-btn{font-size:12px;padding:4px 12px;border-radius:8px;border:1px solid var(--line);
+            background:#fff;cursor:pointer;font-family:inherit;transition:.15s;flex:none}
+  .copy-btn:hover{border-color:var(--brand);color:var(--brand)}
+  .copy-btn.copied{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+  .json-area{width:100%;height:180px;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;
+             font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.55;resize:vertical;
+             background:#f8f9fd;color:#2a3040;box-sizing:border-box}
+  .json-area.tall{height:260px}
+
   /* ===== practice mode home ===== */
   .practice-panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px;margin-bottom:14px}
   .practice-panel h3{font-size:17px;margin-bottom:6px}
@@ -183,7 +210,7 @@
   /* ===== result modal ===== */
   .modal-mask{position:fixed;inset:0;background:rgba(15,20,35,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
   .modal-mask.show{display:flex}
-  .modal{background:#fff;border-radius:16px;padding:30px;max-width:440px;width:100%;text-align:center;animation:pop .25s}
+  .modal{background:#fff;border-radius:16px;padding:30px;max-width:440px;width:100%;text-align:center;animation:pop .25s;max-height:90vh;overflow-y:auto}
   @keyframes pop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
   .modal .score-big{font-size:52px;font-weight:800;color:var(--brand);line-height:1.1}
   .modal .sub{color:var(--muted);font-size:14px;margin:8px 0 18px}
@@ -219,7 +246,59 @@
     <button class="mode-tab" id="tabPractice">⚡ 刷题模式</button>
   </div>
   <div id="paperList"></div>
+  <button class="btn import-btn" id="importBtn">＋ 通过链接解析新试卷（星光公考解析页 → JSON）</button>
   <div id="practiceHome" style="display:none"></div>
+</div>
+
+<!-- ===== URL 解析器弹窗 ===== -->
+<div class="modal-mask" id="importMask">
+  <div class="modal wide">
+    <div class="modal-title">试卷链接解析器</div>
+    <div class="import-field">
+      <label>星光公考解析页链接</label>
+      <input id="importUrl" placeholder="https://www.xingguanggongkao.com/pc/ExportPdf/paperAnalysisByQrcode/id/2814">
+    </div>
+    <div class="import-field">
+      <label>试卷标题（留空则自动取页面标题）</label>
+      <input id="importTitle" placeholder="例如：2026年xx省公务员录用考试《行测》真题">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:4px">
+      <button class="btn" style="flex:1" onclick="document.getElementById('importMask').classList.remove('show')">关闭</button>
+      <button class="btn primary" style="flex:2" id="importGo">开始解析</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--muted);margin:10px 0 4px;text-align:center">
+      —— 自动抓取失败时（GitHub Pages 等纯静态部署常遇跨域限制），用下面的手动方式 ——
+    </div>
+    <div class="import-field">
+      <label>手动粘贴解析页 HTML 源码（可选）</label>
+      <textarea class="json-area" id="importHtml" style="height:90px" placeholder="在解析页右键 → 查看网页源代码 → 全选复制，粘贴到这里，再点「开始解析」"></textarea>
+    </div>
+    <div class="import-log" id="importLog"></div>
+    <!-- 解析结果：两个 JSON 输出框 -->
+    <div id="importResult" style="display:none">
+      <div class="json-box">
+        <div class="json-box-head">
+          <b>① 注册表条目</b>
+          <span class="hint">追加到 assets/index.json 的数组中</span>
+          <button class="copy-btn" id="copyMeta">复制</button>
+        </div>
+        <textarea class="json-area" id="jsonMeta" readonly></textarea>
+      </div>
+      <div class="json-box">
+        <div class="json-box-head">
+          <b>② 题库文件</b>
+          <span class="hint" id="paperFileHint">保存为 assets/papers/xxx.json</span>
+          <button class="copy-btn" id="copyPaper">复制</button>
+        </div>
+        <textarea class="json-area tall" id="jsonPaper" readonly></textarea>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6">
+      说明：解析在你浏览器本地完成；题目图片以内嵌 base64 形式打包进题库 JSON，无需额外处理图片。<br>
+      · <b>自托管服务器</b>：运行 <code>node tools/proxy-server.js</code> 并从对应端口访问，抓取走内置 <code>/proxy</code> 接口，全自动。<br>
+      · <b>GitHub Pages</b>：静态托管无法代理外站，会依次尝试公共代理；失败时把解析页 HTML 源码粘贴到上方文本框再解析即可（图片仍会尝试代理内嵌，失败的保留原链接）。
+    </div>
+  </div>
 </div>
 
 <!-- ===== 刷题模式做题页 ===== -->
@@ -878,6 +957,259 @@ function switchTab(which){
 window.switchTab = switchTab;
 $('tabMock').onclick = ()=>switchTab('mock');
 $('tabPractice').onclick = ()=>switchTab('practice');
+
+/* ================= 通过 URL 解析试卷（输出两个 JSON） ================= */
+$('importBtn').onclick = ()=>{
+  $('importUrl').value = '';
+  $('importTitle').value = '';
+  $('importLog').classList.remove('show');
+  $('importLog').innerHTML = '';
+  $('importResult').style.display = 'none';
+  $('importMask').classList.add('show');
+};
+
+function importLog(msg, isErr){
+  const el = $('importLog');
+  el.classList.add('show');
+  el.innerHTML += (isErr ? `<span class="err">${msg}</span>` : msg) + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+/* 解析星光公考解析页 HTML -> 题目数组（与 paper JSON 同构） */
+function parseXingguang(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const tc = doc.querySelector('div.tab-content');
+  if(!tc) throw new Error('未找到页面内容区（div.tab-content），页面结构可能已变化');
+
+  function processElement(el){
+    const out = [];
+    el.childNodes.forEach(ch=>{
+      if(ch.nodeType === 3){
+        const t = ch.textContent.trim();
+        if(t) out.push({k:'t', v:t});
+      } else if(ch.nodeType === 1){
+        const tag = ch.tagName.toLowerCase();
+        if(tag === 'img'){
+          const src = ch.getAttribute('src') || '';
+          if(src) out.push({k:'img', v:src});
+        } else if(tag === 'table'){
+          const rows = [];
+          ch.querySelectorAll('tr').forEach(tr=>{
+            rows.push([...tr.querySelectorAll('td,th')].map(c=>c.textContent.trim()));
+          });
+          out.push({k:'table', v:rows});
+        } else if(tag === 'br'){
+          out.push({k:'t', v:'\n'});
+        } else {
+          out.push(...processElement(ch));
+        }
+      }
+    });
+    const merged = [];
+    out.forEach(it=>{
+      if(it.k==='t' && merged.length && merged[merged.length-1].k==='t'){
+        merged[merged.length-1].v += it.v;
+      } else merged.push(it);
+    });
+    return merged;
+  }
+
+  function toHtml(content){
+    return (content||[]).map(it=>{
+      if(it.k==='t'){
+        const esc = it.v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return esc.replace(/\n/g,'<br>');
+      }
+      if(it.k==='img'){
+        return `<img src="${it.v}" alt="图" loading="lazy">`;
+      }
+      if(it.k==='table'){
+        return '<table class="qtable">' + it.v.map(r=>'<tr>'+r.map(c=>`<td>${c}</td>`).join('')+'</tr>').join('') + '</table>';
+      }
+      return '';
+    }).join('');
+  }
+
+  const qs = [];
+  let curSection = '', curAbstract = null;
+  tc.querySelectorAll(':scope > div').forEach(div=>{
+    const cls = div.className || '';
+    if(cls.includes('module_div')){
+      curSection = div.textContent.replace(/\s+/g,' ').trim();
+      curAbstract = null;
+    } else if(cls.includes('abstract')){
+      curAbstract = processElement(div);
+    } else if(cls.includes('ques_stem')){
+      qs.push({section:curSection, abstract:curAbstract,
+               stem:processElement(div), options:null, answer:null, analysis:null});
+      curAbstract = null;
+    } else if(cls.includes('answer_list') && qs.length){
+      qs[qs.length-1].options = [...div.querySelectorAll('.answer_option')].map(od=>processElement(od));
+    } else if(cls.includes('analysis') && qs.length){
+      const ans = div.querySelector('.analysis-right');
+      const m = ans ? ans.textContent.match(/【\s*([A-E]+)\s*】/) : null;
+      qs[qs.length-1].answer = m ? m[1] : null;
+      const ac = div.querySelector('.analysis-content');
+      qs[qs.length-1].analysis = ac ? processElement(ac) : null;
+    }
+  });
+  if(!qs.length) throw new Error('未解析到任何题目');
+
+  return qs.map((q,i)=>{
+    let stem = toHtml(q.stem).replace(/^\s*\d{1,3}[.、\s]*/,'');
+    const options = (q.options||[]).map(o=>toHtml(o).replace(/^\s*[A-E][.、\s]*/,''));
+    let analysis = toHtml(q.analysis).replace(/^\s*【解析】：\s*/,'');
+    return {
+      num: i+1,
+      section: q.section,
+      abstract: q.abstract ? toHtml(q.abstract) : '',
+      stem, options,
+      answer: q.answer || '',
+      analysis
+    };
+  });
+}
+
+/* 通过代理抓取页面（浏览器直连会跨域）
+   优先同源 proxy 接口（自托管时由 tools/proxy-server.js 或你的后端提供），
+   静默失败再试公共代理；全部失败则提示用手动粘贴 HTML 的方式 */
+async function fetchViaProxy(url){
+  const proxies = [
+    u => 'proxy?url=' + encodeURIComponent(u),   // 同源代理（相对路径）
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  ];
+  let lastErr = null;
+  for(const wrap of proxies){
+    try{
+      const r = await fetch(wrap(url), {signal: AbortSignal.timeout(30000)});
+      if(!r.ok){ lastErr = new Error('HTTP ' + r.status); continue; }
+      const text = await r.text();
+      // 校验内容确实来自星光解析页（静态服务器 404 也可能返回 200 的 HTML）
+      if(text && text.includes('tab-content') && text.includes('答案')) return text;
+      lastErr = new Error('代理返回内容不符合预期');
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('抓取失败');
+}
+
+function copyText(btn, text){
+  const done = ()=>{
+    btn.textContent = '✓ 已复制';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = '复制'; btn.classList.remove('copied'); }, 1600);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallback());
+  } else fallback();
+  function fallback(){
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+    done();
+  }
+}
+$('copyMeta').onclick = ()=>copyText($('copyMeta'), $('jsonMeta').value);
+$('copyPaper').onclick = ()=>copyText($('copyPaper'), $('jsonPaper').value);
+
+$('importGo').onclick = async ()=>{
+  const url = $('importUrl').value.trim();
+  const customTitle = $('importTitle').value.trim();
+  if(!/^https?:\/\/(www\.)?xingguanggongkao\.com\//.test(url)){
+    importLog('✗ 请输入星光公考（xingguanggongkao.com）的解析页链接', true);
+    return;
+  }
+  const btn = $('importGo');
+  btn.disabled = true; btn.textContent = '解析中…';
+  $('importLog').innerHTML = ''; $('importLog').classList.add('show');
+  $('importResult').style.display = 'none';
+  try{
+    importLog('① 抓取页面…');
+    const html = await fetchViaProxy(url);
+    importLog(`   成功（${(html.length/1024).toFixed(0)} KB）`);
+
+    importLog('② 解析题目…');
+    const questions = parseXingguang(html);
+    const noAns = questions.filter(q=>!q.answer).length;
+    const badOpt = questions.filter(q=>q.options.length!==4).length;
+    importLog(`   共 ${questions.length} 题` +
+      (noAns ? `，${noAns} 题缺答案` : '，答案完整') +
+      (badOpt ? `，${badOpt} 题选项数不为 4` : ''));
+    if(noAns > questions.length/2) throw new Error('大半题目没有答案，可能不是解析页链接');
+
+    let title = customTitle;
+    if(!title){
+      const m = html.match(/<title>(.*?)<\/title>/);
+      title = m ? m[1].split('-')[0].trim() : ('试卷-' + Date.now());
+    }
+
+    importLog('③ 内嵌题目图片（转 base64）…');
+    const imgUrls = [...new Set(
+      JSON.stringify(questions).match(/https?:\/\/[^"\\]+?\.(?:png|jpg|jpeg|gif)/gi) || []
+    )];
+    let imgOk = 0;
+    for(const u of imgUrls){
+      try{
+        // 图片用 blob 通道抓取（本地代理优先，公共代理兜底）
+        let blob = null;
+        const proxies = [
+          x => 'proxy?url=' + encodeURIComponent(x),   // 相对路径：本地双击打开时静默失败并走公共代理
+          x => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(x),
+        ];
+        for(const w of proxies){
+          try{
+            const r = await fetch(w(u), {signal: AbortSignal.timeout(30000)});
+            if(r.ok){ blob = await r.blob(); if(blob.size >= 100) break; blob = null; }
+          }catch(e){}
+        }
+        if(!blob || blob.size < 100) continue;
+        const dataUrl = await new Promise(res=>{
+          const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(blob);
+        });
+        const esc = u.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        const re = new RegExp(esc, 'g');
+        questions.forEach(q=>{
+          q.stem = q.stem.replace(re, dataUrl);
+          q.abstract = q.abstract.replace(re, dataUrl);
+          q.analysis = q.analysis.replace(re, dataUrl);
+          q.options = q.options.map(o=>o.replace(re, dataUrl));
+        });
+        imgOk++;
+      }catch(e){ /* 失败的图片保留原始链接 */ }
+    }
+    importLog(`   ${imgOk}/${imgUrls.length} 张图片已内嵌` +
+      (imgOk < imgUrls.length ? '（其余保留原站链接，加载时需联网）' : ''));
+
+    // 生成试卷 id（取 url 中的 id 参数，否则时间戳）
+    const idm = url.match(/id\/(\d+)/);
+    const id = idm ? 'xingguang-' + idm[1] : 'paper-' + Date.now().toString(36);
+    const fileName = `assets/papers/${id}.json`;
+    const meta = {
+      id,
+      title,
+      subtitle: '星光公考 · 链接解析导入',
+      total: questions.length,
+      scorePerQuestion: 1,
+      file: fileName,
+      updatedAt: new Date().toISOString().slice(0,10)
+    };
+
+    $('jsonMeta').value = JSON.stringify(meta, null, 2);
+    $('jsonPaper').value = JSON.stringify(questions, null, 1);
+    $('paperFileHint').textContent = `保存为 ${fileName}`;
+    $('importResult').style.display = '';
+    importLog('✓ 解析完成！复制下方两个 JSON 接入系统：');
+    importLog('   · ① 追加到 assets/index.json 数组中');
+    importLog(`   · ② 保存为 ${fileName}`);
+    importLog('接入后首页和刷题模式会自动识别，无需改代码。');
+  }catch(e){
+    importLog('✗ 失败：' + e.message, true);
+    if(/抓取|HTTP|Failed to fetch|timeout/i.test(e.message)){
+      importLog('提示：公共代理暂时不可用，可稍后重试。', true);
+    }
+  }
+  btn.disabled = false; btn.textContent = '开始解析';
+};
 </script>
 </body>
 </html>

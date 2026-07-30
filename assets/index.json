@@ -7,5 +7,14 @@
     "scorePerQuestion": 1,
     "file": "assets/papers/2026-fujian-xingce.json",
     "updatedAt": "2026-03-14"
+  },
+  {
+    "id": "xingguang-2491",
+    "title": "2025年福建省公务员录用考试《行测》真题（考生回忆版）",
+    "subtitle": "星光公考 · 含答案与详细解析",
+    "total": 120,
+    "scorePerQuestion": 1,
+    "file": "assets/papers/xingguang-2491.json",
+    "updatedAt": "2026-07-30"
   }
 ]
